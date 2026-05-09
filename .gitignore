@@ -1,2 +1,4 @@
 .history
 .playwright-mcp
+*.local*
+.vscode
