@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "result=$($HOME/.goenv/shims/golangci-lint run backend/... 2>&1); rc=$?; [ $rc -ne 0 ] && [ $rc -ne 5 ] && jq -cn --arg m \"$result\" '{\"systemMessage\":(\"golangci-lint:\\n\"+$m)}' || exit 0",
+            "command": "input=$(cat); active=$(echo \"$input\" | jq -r '.stop_hook_active // false'); if [ \"$active\" = \"true\" ]; then exit 0; fi; result=$(cd backend && $HOME/.goenv/shims/golangci-lint run ./... 2>&1); rc=$?; if [ $rc -ne 0 ] && [ $rc -ne 5 ]; then jq -cn --arg m \"$result\" '{\"decision\":\"block\",\"reason\":(\"golangci-lint failed:\\n\"+$m+\"\\n\\nFix the lint issues before stopping.\")}'; else exit 0; fi",
             "timeout": 120,
             "statusMessage": "golangci-lint 実行中..."
           }

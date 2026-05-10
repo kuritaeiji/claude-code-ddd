@@ -19,8 +19,8 @@ Read ツールで docs/ 配下のドキュメントをすべて読み、ドメ�
 - docs/production-requirements.md
 - docs/domain.md
 - docs/usecase.md
-- docs/architecture.md
 - docs/schema.md（存在しない場合はスキップ）
+- docs/architecture.md
 - docs/repository-structure.md
 
 ---
