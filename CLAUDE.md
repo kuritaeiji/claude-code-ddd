@@ -1,33 +1,67 @@
+## プロジェクト概要
+
+**タスク管理バックエンド API**（学習目的）
+
+DDD・オニオンアーキテクチャ・CQRS を Go で実践するための学習プロジェクト。
+認証なし、インメモリイベントバス、ローカル開発のみを前提とする。
+
+### 技術スタック
+
+| 要素   | 採用技術   |
+| ------ | ---------- |
+| 言語   | Go         |
+| HTTP   | net/http   |
+| ORM    | gorm       |
+| DB     | PostgreSQL |
+| テスト | testify    |
+
+### アーキテクチャの要点
+
+- **オニオンアーキテクチャ**: 依存方向は Domain ← Usecase ← Controller、Domain ← Infrastructure のみ許可
+- **CQRS**: クエリ（Read）はドメインモデルを経由せず、専用 DTO で DB から直接読み取る
+- **ドメインイベント**: インメモリ EventBus。EventHandler は Usecase 層に実装し、main.go で DI する
+- **バリデーション**: すべてドメイン層で実施する
+
+### 開発ワークフロー
+
+機能を実装するときは `/implement <機能名>` スキルを使う。
+スキルが以下を自動実行する：ドキュメント理解 → パターン調査 → 計画作成（`.steering/`）→ 実装ループ → レビュー → テスト
+
+---
+
 ## ディレクトリ構造
 
-### 永続的ドキュメント（docs/）
-
-アプリケーションの「何を作るか」「どう作るか」を定義
-
-1. プロダクト要求定義書: production-requirements.md
-   - プロダクトの目的・背景
-   - 対象ユーザー
-   - 解決する課題
-   - スコープ（やること・やらないこと）
-   - 開発フェーズ
-2. ドメイン定義書: domain.md
-   - ドメインモデル図（全集約の俯瞰・多重度含む）
-   - 集約ごとのセクション（以下を各集約にまとめる）
-     - エンティティ・値オブジェクトの定義
-     - ビジネスルール
-     - ドメインイベントと副作用（該当する集約のみ）
-3. ユースケース定義書: usecase.md
-   - ユースケース一覧（コマンド）とそれに対応するAPIエンドポイント
-   - クエリ一覧（CQRS Read側）とそれに対応するAPIエンドポイント
-   - ※リクエスト・レスポンスの型詳細はコード（Go構造体）をソースオブトゥルースとし、ドキュメントには書かない
-4. 技術仕様書: architecture.md
-   - 技術スタック
-   - アーキテクチャ構成図と層の責務
-   - 層をまたぐデータ構造のパターン（xxxRequest → xxxParams → xxxDTO → xxxResponse の流れ）
-   - 非機能要件（バリデーション・エラーハンドリングの方針）
-5. DBスキーマ定義書: schema.md
-   - ER図
-   - テーブル定義（カラム名・型・制約）
-   - ドメインモデルとのマッピング（値オブジェクトがどのカラムに対応するか）
-6. リポジトリ構造定義書: repository-structure.md
-   - ディレクトリ構成とその意図
+```
+.
+├── docs/                        # 永続的ドキュメント（設計の source of truth）
+│   ├── production-requirements.md  # プロダクト概要・スコープ・開発フェーズ
+│   ├── domain.md                   # ドメインモデル・ビジネスルール・ドメインイベント
+│   ├── usecase.md                  # ユースケース一覧・APIエンドポイント
+│   ├── architecture.md             # 技術スタック・層構成・データフロー・非機能要件
+│   ├── schema.md                   # ER図・テーブル定義・ドメインモデルとのマッピング
+│   └── repository-structure.md     # ディレクトリ構成とその意図
+├── backend/
+│   ├── cmd/api/main.go             # エントリーポイント・DI・サーバー起動
+│   ├── internal/
+│   │   ├── domain/                 # Domain層: エンティティ・値オブジェクト・リポジトリIF・ドメインイベント
+│   │   │   ├── task.go
+│   │   │   ├── user.go
+│   │   │   └── event.go            # EventBus IF・EventHandler IF・イベント型定義
+│   │   ├── usecase/
+│   │   │   ├── command/            # CQRSコマンド（書き込み）・EventHandler実装
+│   │   │   └── query/              # CQRSクエリ（読み込み）・DB直接読み取り
+│   │   ├── controller/             # net/http ハンドラー（xxxRequest → xxxParams → xxxDTO → xxxResponse）
+│   │   └── infrastructure/
+│   │       ├── repository/         # gorm リポジトリ実装
+│   │       └── event/              # インメモリ EventBus 実装
+│   └── pkg/errors/                 # ドメインエラー種別定義
+├── .steering/                   # 実装計画（/implement スキルが自動生成）
+│   └── YYYYMMDD-<機能名>/
+│       ├── requirements.md         # 要件・ビジネスルール
+│       ├── approach.md             # 実装方針・作成ファイル一覧
+│       └── tasks.md                # タスクリスト（[ ]/[x]）
+└── .claude/
+    └── skills/
+        ├── implement/SKILL.md      # /implement スキル（実装ワークフロー自動実行）
+        └── review-docs/SKILL.md    # /review-docs スキル（ドキュメントレビュー）
+```
