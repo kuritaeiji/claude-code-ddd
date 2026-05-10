@@ -1,4 +1,19 @@
 {
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)",
+      "Grep(**)",
+      "Glob(**)",
+      "Bash(date *)",
+      "Bash(mkdir *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(go test *)",
+      "Agent(*)"
+    ]
+  },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "playwright"
@@ -11,6 +26,22 @@
           {
             "type": "command",
             "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; echo \"$f\" | grep -q '\\.md$' && npx prettier --write \"$f\"; } 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; echo \"$f\" | grep -q '\\.go$' && gofmt -w \"$f\"; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "result=$($HOME/.goenv/shims/golangci-lint run backend/... 2>&1); rc=$?; [ $rc -ne 0 ] && [ $rc -ne 5 ] && jq -cn --arg m \"$result\" '{\"systemMessage\":(\"golangci-lint:\\n\"+$m)}' || exit 0",
+            "timeout": 120,
+            "statusMessage": "golangci-lint 実行中..."
           }
         ]
       }
