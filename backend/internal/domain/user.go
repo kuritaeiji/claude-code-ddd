@@ -78,7 +78,10 @@ type User struct {
 	events      []DomainEvent
 }
 
-func NewUser(email Email, displayName string) (*User, error) {
+// newUser はパッケージ外から直接呼べない。
+// 公開すると email 一意性チェック（BR-U-01）をスキップして User を生成できてしまうため、
+// 外部からの正規の生成パスは UserRegistrar.Register のみとする。
+func newUser(email Email, displayName string) (*User, error) {
 	if err := validateDisplayName(displayName); err != nil {
 		return nil, err
 	}

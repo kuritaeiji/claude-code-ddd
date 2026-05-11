@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -142,54 +141,6 @@ func TestUserStatus_IsActive(t *testing.T) {
 	assert.False(t, domain.UserStatusInactive.IsActive())
 }
 
-func TestNewUser(t *testing.T) {
-	t.Parallel()
-
-	email, err := domain.NewEmail("user@example.com")
-	require.NoError(t, err)
-
-	t.Run("creates active user", func(t *testing.T) {
-		t.Parallel()
-		u, err := domain.NewUser(email, "Alice")
-		require.NoError(t, err)
-		assert.Equal(t, "Alice", u.DisplayName())
-		assert.Equal(t, domain.UserStatusActive, u.Status())
-		assert.Equal(t, email, u.Email())
-		_, parseErr := uuid.Parse(u.ID().String())
-		assert.NoError(t, parseErr, "generated UserID must be a valid UUID")
-		assert.Empty(t, u.PullEvents(), "newly created user must not have pending events")
-	})
-
-	t.Run("display name boundary", func(t *testing.T) {
-		t.Parallel()
-
-		tests := []struct {
-			name        string
-			displayName string
-			wantErr     bool
-		}{
-			{"empty rejected", "", true},
-			{"1 char accepted", "a", false},
-			{"50 chars accepted", strings.Repeat("a", 50), false},
-			{"51 chars rejected", strings.Repeat("a", 51), true},
-			{"50 multibyte chars accepted", strings.Repeat("あ", 50), false},
-			{"51 multibyte chars rejected", strings.Repeat("あ", 51), true},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-				_, err := domain.NewUser(email, tt.displayName)
-				if tt.wantErr {
-					assert.Error(t, err)
-					return
-				}
-				assert.NoError(t, err)
-			})
-		}
-	})
-}
-
 func TestReconstructUser(t *testing.T) {
 	t.Parallel()
 
@@ -212,7 +163,7 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("active to inactive enqueues event", func(t *testing.T) {
 		t.Parallel()
-		u, err := domain.NewUser(email, "Alice")
+		u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
 		require.NoError(t, err)
 
 		require.NoError(t, u.Deactivate())
@@ -242,7 +193,7 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("double deactivate rejects the second call", func(t *testing.T) {
 		t.Parallel()
-		u, err := domain.NewUser(email, "Carol")
+		u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Carol", domain.UserStatusActive)
 		require.NoError(t, err)
 
 		require.NoError(t, u.Deactivate())
@@ -258,7 +209,7 @@ func TestUser_PullEvents(t *testing.T) {
 
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
-	u, err := domain.NewUser(email, "Alice")
+	u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
 	require.NoError(t, err)
 	require.NoError(t, u.Deactivate())
 
