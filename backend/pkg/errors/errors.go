@@ -1,16 +1,17 @@
 package errors
 
-import "fmt"
-
+// ValidationError は入力値・ビジネスルール違反を表すドメインエラー。
+// 人間可読な文字列ではなく翻訳キー（MessageID）とテンプレート変数のみを保持し、
+// Error() で初めて Translator 経由で文字列化される。
 type ValidationError struct {
-	Field   string
-	Message string
+	MessageID    string
+	TemplateData map[string]any
 }
 
-func NewValidationError(field, message string) *ValidationError {
-	return &ValidationError{Field: field, Message: message}
+func NewValidationError(messageID string, templateData map[string]any) *ValidationError {
+	return &ValidationError{MessageID: messageID, TemplateData: templateData}
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation error: %s: %s", e.Field, e.Message)
+	return translate(e.MessageID, e.TemplateData)
 }

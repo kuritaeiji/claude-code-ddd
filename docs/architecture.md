@@ -42,6 +42,16 @@ flowchart TB
 
 これにより Infrastructure は Domain インターフェースのみに依存し、Usecase パッケージを直接参照しない。
 
+#### pkg/errors の位置づけ
+
+`backend/pkg/errors/` は Domain 層と同格の **最内層**として扱う。配置場所が `internal/domain/` の外であるのは「ドメインエラー種別と薄いインターフェースだけを集めた、他層から横断的に参照される最小モジュール」として独立させているためで、依存方向上は Domain 層と同じ最も内側に位置づけられる。
+
+| ルール                                                            | 理由・適用                                                                                               |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `pkg/errors` は他層・外部ライブラリに依存しない                   | 最内層のため。go-i18n 等の翻訳ライブラリにも依存させない                                                 |
+| Domain 層は `pkg/errors` のエラー型を return してよい             | ドメインメソッドのエラーは `pkg/errors` で定義された型（`ValidationError` 等）を使う                     |
+| Infrastructure 層は `pkg/errors` のインターフェースを実装してよい | `Translator` を Infrastructure 層で実装し、起動時に `pkg/errors` へ DI する（`EventBus` と同じパターン） |
+
 ### 層ごとのデータ構造
 
 | 層               | 入力                | 出力                 |
@@ -76,6 +86,53 @@ flowchart TB
 | リソース未存在       | 404            |
 | ドメインルール違反   | 422            |
 | サーバーエラー       | 500            |
+
+### 国際化（i18n）
+
+エラーメッセージは英語（デフォルト）と日本語の 2 言語に対応する。`github.com/nicksnyder/go-i18n/v2/i18n` を採用し、翻訳ファイルは YAML（`gopkg.in/yaml.v3`）で記述する。
+
+#### 設計原則
+
+- **ドメインエラーは翻訳キーのみを持つ**。`pkg/errors` で定義されるすべてのドメインエラー（`ValidationError`・`NotFoundError`・`DomainRuleError` 等）は `MessageID`（例: `validation.email.required`）と `TemplateData`（テンプレート変数）を保持し、人間可読な文字列は持たない。Domain 層は go-i18n に依存しない
+- **Domain 層と `Translator` の関係**。Domain 層は `pkg/errors` のエラー型を return するだけで、`Translator` インターフェース自体は参照しない。`Translator` は `pkg/errors` 内部で `Error()` メソッドから利用される
+- **翻訳は外側で行う**。HTTP レスポンス用の翻訳は Controller 境界で `Accept-Language` ヘッダから生成した `*i18n.Localizer` により実施する
+- **`Error()` 用にデフォルト言語（英語）の翻訳器を `pkg/errors` に注入する**。これにより `err.Error()` がログ等に出力される際、英語の完成文（例: `validation error: email: is required`）が得られる。`pkg/errors` は go-i18n に直接依存せず、薄い `Translator` インターフェース（`Translate(messageID string, templateData map[string]any) string`）だけを公開し、起動時に Infrastructure 層の実装を `errors.SetDefaultTranslator` で注入する
+- **Translator 未注入時のフォールバック**。`SetDefaultTranslator` が呼ばれる前に `Error()` が呼ばれた場合（テスト等）は、`MessageID` 文字列をそのまま返す（panic させない）
+
+#### 構成要素
+
+| 要素                                   | 配置場所                                            | 責務                                                                                                                                                                                       |
+| -------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Translator` インターフェース          | `pkg/errors`                                        | `Translate(messageID, templateData) string` のみを持つ薄いIF。`ValidationError`・`NotFoundError`・`DomainRuleError` 等の `Error()` から参照される                                          |
+| `*i18n.Bundle`                         | Infrastructure 層（`internal/infrastructure/i18n`） | 全言語のメッセージを保持する singleton。アプリ起動時に YAML を読み込んで 1 回構築                                                                                                          |
+| 英語固定 `Translator` 実装             | Infrastructure 層                                   | `Bundle` をラップし、英語固定の Localizer で翻訳する。起動時に `errors.SetDefaultTranslator` で `pkg/errors` に注入                                                                        |
+| リクエスト用 `Translator` 実装         | Infrastructure 層                                   | リクエストの `Accept-Language` から都度 `*i18n.Localizer` を生成しラップする                                                                                                               |
+| context key・`TranslatorFrom` ヘルパー | Infrastructure 層（`internal/infrastructure/i18n`） | リクエスト用 Translator を `context.Context` に出し入れするための非公開 key と取り出し関数（例: `i18n.TranslatorFrom(ctx) errors.Translator`）。Controller 層から使う                      |
+| i18n ミドルウェア                      | Controller 層                                       | `Accept-Language` を読み、リクエスト用 Translator を `TranslatorFrom` 用の context key で `context.Context` に格納する                                                                     |
+| 翻訳ファイル                           | `backend/locales/`                                  | `en.yaml`・`ja.yaml`。MessageID をネストしたキーで階層化。Go コードではなく静的リソースのため、Infrastructure 層の中ではなく `backend/` 直下に配置し、`embed` で取り込まない実ファイル運用 |
+
+#### データフロー
+
+```mermaid
+flowchart LR
+    Request["HTTP Request<br/>Accept-Language: ja"] --> MW["i18n ミドルウェア<br/>Controller層"]
+    MW -->|"Translator を ctx に格納"| Handler["ハンドラー"]
+    Handler -->|呼び出し| Domain["Domain層"]
+    Domain -->|"ValidationError<br/>MessageID + TemplateData"| Handler
+    Handler -->|"ctx の Translator で翻訳"| Response["HTTP Response<br/>（ja 文字列）"]
+
+    Handler -.->|"err.Error() を呼ぶ<br/>（ロガーミドルウェア等）"| DefaultTranslator["英語固定 Translator<br/>（pkg/errors に DI 済み）"]
+    DefaultTranslator -.-> Log["ログ出力<br/>（en 文字列）"]
+```
+
+`err.Error()` を呼ぶ主体は Controller 層のロガー/recover ミドルウェアを想定する。Domain 層自身は `err.Error()` を呼ばず、エラーを上位に返すだけにとどめる。
+
+#### サポート言語
+
+| 言語タグ | 用途                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------ |
+| `en`     | デフォルト言語。`Accept-Language` が未指定または未対応の場合のフォールバック。`err.Error()` の出力言語 |
+| `ja`     | 日本語クライアント向け                                                                                 |
 
 ### テスト方針
 

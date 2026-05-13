@@ -24,7 +24,7 @@ func (r *UserRegistrar) Register(email Email, displayName string) (*User, error)
 		return nil, err
 	}
 	if exists {
-		return nil, apperrors.NewValidationError("email", "is already registered")
+		return nil, apperrors.NewValidationError("validation.email.already_registered", nil)
 	}
 	return newUser(email, displayName)
 }

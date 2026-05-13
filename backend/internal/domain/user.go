@@ -20,7 +20,7 @@ type UserID struct {
 
 func NewUserID(value string) (UserID, error) {
 	if _, err := uuid.Parse(value); err != nil {
-		return UserID{}, apperrors.NewValidationError("UserID", "must be a valid UUID")
+		return UserID{}, apperrors.NewValidationError("validation.user_id.invalid", nil)
 	}
 	return UserID{value: value}, nil
 }
@@ -39,11 +39,11 @@ type Email struct {
 
 func NewEmail(value string) (Email, error) {
 	if value == "" {
-		return Email{}, apperrors.NewValidationError("email", "is required")
+		return Email{}, apperrors.NewValidationError("validation.email.required", nil)
 	}
 	addr, err := mail.ParseAddress(value)
 	if err != nil || addr.Address != value {
-		return Email{}, apperrors.NewValidationError("email", "must be a valid email address")
+		return Email{}, apperrors.NewValidationError("validation.email.invalid", nil)
 	}
 	return Email{value: value}, nil
 }
@@ -64,7 +64,7 @@ func NewUserStatus(value string) (UserStatus, error) {
 	case UserStatusActive, UserStatusInactive:
 		return UserStatus(value), nil
 	default:
-		return "", apperrors.NewValidationError("status", "must be ACTIVE or INACTIVE")
+		return "", apperrors.NewValidationError("validation.user_status.invalid", nil)
 	}
 }
 
@@ -110,7 +110,10 @@ func ReconstructUser(id UserID, email Email, displayName string, status UserStat
 func validateDisplayName(value string) error {
 	length := utf8.RuneCountInString(value)
 	if length < displayNameMinLen || length > displayNameMaxLen {
-		return apperrors.NewValidationError("displayName", "must be 1-50 characters")
+		return apperrors.NewValidationError("validation.display_name.length", map[string]any{
+			"Min": displayNameMinLen,
+			"Max": displayNameMaxLen,
+		})
 	}
 	return nil
 }
@@ -124,7 +127,7 @@ func (u *User) Status() UserStatus  { return u.status }
 // 既に INACTIVE の場合は BR-U-03 によりバリデーションエラーを返す。
 func (u *User) Deactivate() error {
 	if u.status == UserStatusInactive {
-		return apperrors.NewValidationError("status", "user is already inactive")
+		return apperrors.NewValidationError("validation.user.already_inactive", nil)
 	}
 	u.status = UserStatusInactive
 	u.events = append(u.events, NewUserDeactivated(u.id))

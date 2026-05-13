@@ -1,9 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Read(/home/kuritaeiji/claude-code/**)",
-      "Write(/home/kuritaeiji/claude-code/**)",
-      "Edit(/home/kuritaeiji/claude-code/**)",
+      "Read(//home/kuritaeiji/claude-code/**)",
+      "Write(//home/kuritaeiji/claude-code/**)",
+      "Edit(//home/kuritaeiji/claude-code/**)",
       "Bash(date *)",
       "Bash(mkdir *)",
       "Bash(find *)",

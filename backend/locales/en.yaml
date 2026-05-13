@@ -1,0 +1,7 @@
+validation.user_id.invalid: "validation error: UserID must be a valid UUID"
+validation.email.required: "validation error: email is required"
+validation.email.invalid: "validation error: email must be a valid email address"
+validation.email.already_registered: "validation error: email is already registered"
+validation.user_status.invalid: "validation error: status must be ACTIVE or INACTIVE"
+validation.display_name.length: "validation error: displayName must be {{.Min}}-{{.Max}} characters"
+validation.user.already_inactive: "validation error: user is already inactive"

@@ -18,9 +18,13 @@ backend/
 │   │   └── ...                  # net/http ハンドラー
 │   └── infrastructure/
 │       ├── repository/          # gormリポジトリ実装
-│       └── event/               # インメモリイベントバス実装
+│       ├── event/               # インメモリイベントバス実装
+│       └── i18n/                # go-i18n Bundle・Translator 実装（英語固定 / Accept-Language ベース）
+├── locales/                     # 翻訳ファイル（YAML）
+│   ├── en.yaml                  # 英語（デフォルト言語）
+│   └── ja.yaml                  # 日本語
 ├── pkg/
-│   └── errors/                  # ドメインエラー種別定義（ValidationError・NotFoundError等）
+│   └── errors/                  # ドメインエラー種別定義 + Translator インターフェース
 ├── docker-compose.yml           # ローカル開発用PostgreSQL起動
 ├── .env.example                 # 環境変数テンプレート（コミット対象・ダミー値）
 └── .env.local                   # 実際の認証情報（.gitignore対象・コミット禁止）
@@ -43,4 +47,6 @@ backend/
 | `backend/internal/controller/`                | Controller層         | net/http ハンドラー。リクエストを xxxRequest に bind し、xxxParams に変換して Usecase を呼び出す。Usecase から受け取った xxxDTO を xxxResponse に変換してレスポンスを返す                                                                                                                          |
 | `backend/internal/infrastructure/repository/` | Infrastructure層     | gorm を使った TaskRepository・UserRepository の実装。Domain 層で定義されたリポジトリインターフェースを満たす                                                                                                                                                                                       |
 | `backend/internal/infrastructure/event/`      | Infrastructure層     | インメモリ EventBus の実装。Domain 層で定義された EventBus インターフェースを満たす。登録された EventHandler を順に呼び出す                                                                                                                                                                        |
-| `backend/pkg/errors/`                         | —                    | ドメインエラー種別（ValidationError・NotFoundError・DomainRuleError 等）を定義する。internal 外から参照できるよう pkg に配置する                                                                                                                                                                   |
+| `backend/internal/infrastructure/i18n/`       | Infrastructure層     | `github.com/nicksnyder/go-i18n/v2/i18n` の `*i18n.Bundle` 構築と `errors.Translator` インターフェース実装を集約する。`pkg/errors` に注入する英語固定 Translator と、Controller 層のミドルウェアが `Accept-Language` から都度作るリクエスト用 Translator の 2 種類を提供する                        |
+| `backend/locales/`                            | —                    | go-i18n 用の翻訳ファイル（`en.yaml`・`ja.yaml`）。ドメインエラーの `MessageID` をネストキーで階層化して記述する。アプリ起動時に Infrastructure 層の i18n パッケージが読み込む                                                                                                                      |
+| `backend/pkg/errors/`                         | —                    | ドメインエラー種別（ValidationError・NotFoundError・DomainRuleError 等）と、`Error()` から参照される `Translator` インターフェース・パッケージレベルのデフォルト Translator 注入関数（`SetDefaultTranslator`）を定義する。internal 外から参照できるよう pkg に配置する。go-i18n には依存しない     |

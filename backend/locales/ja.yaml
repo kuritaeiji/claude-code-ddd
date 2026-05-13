@@ -1,0 +1,7 @@
+validation.user_id.invalid: "バリデーションエラー: ユーザーIDはUUID形式である必要があります"
+validation.email.required: "バリデーションエラー: メールアドレスは必須です"
+validation.email.invalid: "バリデーションエラー: メールアドレスの形式が正しくありません"
+validation.email.already_registered: "バリデーションエラー: メールアドレスは既に登録されています"
+validation.user_status.invalid: "バリデーションエラー: ステータスはACTIVEまたはINACTIVEである必要があります"
+validation.display_name.length: "バリデーションエラー: 表示名は{{.Min}}〜{{.Max}}文字である必要があります"
+validation.user.already_inactive: "バリデーションエラー: ユーザーは既に非活性化されています"
