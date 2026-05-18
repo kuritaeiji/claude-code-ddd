@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -148,11 +149,73 @@ func TestReconstructUser(t *testing.T) {
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
 
-	u, err := domain.ReconstructUser(id, email, "Bob", domain.UserStatusInactive)
-	require.NoError(t, err)
+	u := domain.ReconstructUser(id, email, "Bob", domain.UserStatusInactive)
 	assert.True(t, id.Equals(u.ID()))
 	assert.Equal(t, domain.UserStatusInactive, u.Status())
 	assert.Empty(t, u.PullEvents(), "reconstruction must not enqueue events")
+}
+
+// 復元はリポジトリの DB 値を信頼するため、業務ルール（BR-U-02）の再検査を行わない。
+func TestReconstructUser_SkipsDisplayNameValidation(t *testing.T) {
+	t.Parallel()
+
+	email, err := domain.NewEmail("user@example.com")
+	require.NoError(t, err)
+
+	t.Run("display name longer than 50 chars is accepted on reconstruction", func(t *testing.T) {
+		t.Parallel()
+		over := strings.Repeat("a", 60)
+		u := domain.ReconstructUser(domain.GenerateUserID(), email, over, domain.UserStatusActive)
+		assert.Equal(t, over, u.DisplayName())
+	})
+
+	t.Run("empty display name is accepted on reconstruction", func(t *testing.T) {
+		t.Parallel()
+		u := domain.ReconstructUser(domain.GenerateUserID(), email, "", domain.UserStatusActive)
+		assert.Equal(t, "", u.DisplayName())
+	})
+}
+
+func TestRestoreUserID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"valid uuid", uuid.NewString()},
+		{"not a uuid (still accepted)", "not-a-uuid"},
+		{"empty (still accepted)", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			id := domain.RestoreUserID(tt.value)
+			assert.Equal(t, tt.value, id.String())
+		})
+	}
+}
+
+func TestRestoreEmail(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"valid", "user@example.com"},
+		{"missing at-sign (still accepted)", "userexample.com"},
+		{"empty (still accepted)", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			email := domain.RestoreEmail(tt.value)
+			assert.Equal(t, tt.value, email.String())
+		})
+	}
 }
 
 func TestUser_Deactivate(t *testing.T) {
@@ -163,8 +226,7 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("active to inactive enqueues event", func(t *testing.T) {
 		t.Parallel()
-		u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
-		require.NoError(t, err)
+		u := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
 
 		require.NoError(t, u.Deactivate())
 
@@ -179,10 +241,9 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("already-inactive user returns validation error (BR-U-03)", func(t *testing.T) {
 		t.Parallel()
-		u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Bob", domain.UserStatusInactive)
-		require.NoError(t, err)
+		u := domain.ReconstructUser(domain.GenerateUserID(), email, "Bob", domain.UserStatusInactive)
 
-		err = u.Deactivate()
+		err := u.Deactivate()
 
 		require.Error(t, err)
 		var ve *apperrors.ValidationError
@@ -193,11 +254,10 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("double deactivate rejects the second call", func(t *testing.T) {
 		t.Parallel()
-		u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Carol", domain.UserStatusActive)
-		require.NoError(t, err)
+		u := domain.ReconstructUser(domain.GenerateUserID(), email, "Carol", domain.UserStatusActive)
 
 		require.NoError(t, u.Deactivate())
-		err = u.Deactivate()
+		err := u.Deactivate()
 
 		assert.Error(t, err)
 		assert.Len(t, u.PullEvents(), 1, "only the first deactivation enqueues an event")
@@ -209,8 +269,7 @@ func TestUser_PullEvents(t *testing.T) {
 
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
-	u, err := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
-	require.NoError(t, err)
+	u := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
 	require.NoError(t, u.Deactivate())
 
 	events := u.PullEvents()

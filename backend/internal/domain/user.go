@@ -25,6 +25,13 @@ func NewUserID(value string) (UserID, error) {
 	return UserID{value: value}, nil
 }
 
+// RestoreUserID はリポジトリからの復元専用ファクトリ。
+// 検証を行わないため、業務ロジックから呼び出してはならない（BR-U-* の入力検証経路を迂回する）。
+// 呼び出し側はインフラ層のリポジトリ実装に限定すること。
+func RestoreUserID(value string) UserID {
+	return UserID{value: value}
+}
+
 func GenerateUserID() UserID {
 	return UserID{value: uuid.NewString()}
 }
@@ -46,6 +53,13 @@ func NewEmail(value string) (Email, error) {
 		return Email{}, apperrors.NewValidationError("validation.email.invalid", nil)
 	}
 	return Email{value: value}, nil
+}
+
+// RestoreEmail はリポジトリからの復元専用ファクトリ。
+// 検証を行わないため、業務ロジックから呼び出してはならない（BR-U-* の入力検証経路を迂回する）。
+// 呼び出し側はインフラ層のリポジトリ実装に限定すること。
+func RestoreEmail(value string) Email {
+	return Email{value: value}
 }
 
 func (e Email) String() string { return e.value }
@@ -93,18 +107,18 @@ func newUser(email Email, displayName string) (*User, error) {
 	}, nil
 }
 
-// ReconstructUser はリポジトリからの復元用ファクトリ。
-// 学習目的で防御的に displayName を再検証している（DB スキーマと不変条件のドリフト検出）。
-func ReconstructUser(id UserID, email Email, displayName string, status UserStatus) (*User, error) {
-	if err := validateDisplayName(displayName); err != nil {
-		return nil, err
-	}
+// ReconstructUser はリポジトリからの復元専用ファクトリ。
+// 復元は「過去に妥当だった状態の再構築」であり、業務ルール（BR-U-02 等）の再検査は行わない。
+// 業務ルール変更時に過去レコードが取得不能になることを避けるため、
+// および DB 不整合は ValidationError ではなく内部エラーとして扱うべきであるため。
+// 呼び出し側はインフラ層のリポジトリ実装に限定すること。
+func ReconstructUser(id UserID, email Email, displayName string, status UserStatus) *User {
 	return &User{
 		id:          id,
 		email:       email,
 		displayName: displayName,
 		status:      status,
-	}, nil
+	}
 }
 
 func validateDisplayName(value string) error {
