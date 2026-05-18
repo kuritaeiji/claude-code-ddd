@@ -19,21 +19,14 @@ func NewUserRepository() *UserRepository {
 	return &UserRepository{}
 }
 
-func (m *UserRepository) Save(user *domain.User) error {
+func (m *UserRepository) Insert(user *domain.User) error {
 	args := m.Called(user)
 	return args.Error(0)
 }
 
-func (m *UserRepository) FindByID(id domain.UserID) (*domain.User, error) {
-	args := m.Called(id)
-	user, _ := args.Get(0).(*domain.User)
-	return user, args.Error(1)
-}
-
-func (m *UserRepository) FindByEmail(email domain.Email) (*domain.User, error) {
-	args := m.Called(email)
-	user, _ := args.Get(0).(*domain.User)
-	return user, args.Error(1)
+func (m *UserRepository) Update(user *domain.User) error {
+	args := m.Called(user)
+	return args.Error(0)
 }
 
 func (m *UserRepository) ExistsByEmail(email domain.Email) (bool, error) {

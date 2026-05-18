@@ -17,7 +17,7 @@ func NewUserRegistrar(repo UserRepository) *UserRegistrar {
 }
 
 // Register は email 一意性を検証して新規ユーザーを生成する。
-// 永続化（UserRepository.Save）は呼び出し側の責務。
+// 永続化（UserRepository.Insert）は呼び出し側の責務。
 func (r *UserRegistrar) Register(email Email, displayName string) (*User, error) {
 	exists, err := r.repo.ExistsByEmail(email)
 	if err != nil {

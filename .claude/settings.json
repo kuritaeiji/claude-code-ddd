@@ -11,6 +11,12 @@
       "Bash(ls *)",
       "Bash(go *)",
       "Bash(golangci-lint *)",
+      "Bash(cd *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git blame*)",
       "Agent(*)"
     ]
   },

@@ -154,9 +154,12 @@ func (u *User) PullEvents() []DomainEvent {
 	return events
 }
 
+// UserRepository は新規作成と更新を別メソッドに分ける。
+// gorm の `Save` が「ID 有無で INSERT/UPDATE を切り替える」挙動はインフラの都合であり、
+// ユースケースは登録（U-01）と非活性化（U-02）の文脈で意図を既に持っているため、
+// その分岐をユースケース層で明示する。
 type UserRepository interface {
-	Save(user *User) error
-	FindByID(id UserID) (*User, error)
-	FindByEmail(email Email) (*User, error)
+	Insert(user *User) error
+	Update(user *User) error
 	ExistsByEmail(email Email) (bool, error)
 }
