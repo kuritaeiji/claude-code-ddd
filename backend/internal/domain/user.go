@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"net/mail"
 	"unicode/utf8"
 
@@ -8,6 +9,11 @@ import (
 
 	apperrors "github.com/kuritaeiji/claude-code-ddd/pkg/errors"
 )
+
+// ErrEmailDuplicate は UserRepository.Insert が email の UNIQUE 制約違反を検知した際に返す sentinel error。
+// インフラ層は DB 固有のエラー（PostgreSQL の SQLSTATE 23505 等）をこの sentinel に翻訳して返し、
+// 業務ルール（BR-U-01）への解釈はドメインサービス UserRegistrar 側で行う。
+var ErrEmailDuplicate = errors.New("email already exists")
 
 const (
 	displayNameMinLen = 1

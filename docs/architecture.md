@@ -142,6 +142,33 @@ flowchart LR
   - モックは Domain インターフェースを満たす必要があり、`mocks` パッケージは Domain にのみ依存する
   - プロダクションコードから `mocks` パッケージを参照することは禁止（テストファイルからのみ import）
 
+### ローカル開発・環境変数管理
+
+環境変数の値は `.env.local`（実値・gitignore 対象）と `.env.example`（テンプレート・コミット対象）に一元管理し、これを **唯一の source of truth** とする。
+
+#### 設計原則
+
+- **読み込みは `config` パッケージに集約する**。環境変数の読み込みは `internal/infrastructure/config` の `Load()` 1 箇所に集約し、`cmd/api/main.go` と integration テストの両方がこれを使う。読み込み口を複数持たない
+- **値は構造体に保持する**。`map[string]string` ではなく named フィールドの `Config`／`DBConfig` 構造体にロードし、どのキーが存在するかをコード上明示する。gorm 用の DSN 組み立ては `DBConfig.DSN()` に固定する
+- **Go コードはデフォルト値を持たない**。必須環境変数（`POSTGRES_*`・`PORT`・`LOCALES_DIR`）を `os.LookupEnv` で読むのみとし、未設定があれば起動時にどの変数が欠けているかを列挙して fail-fast する。暗黙のデフォルト値で誤った接続先に繋がる事故を防ぐ
+- **設定の重複を作らない**。値を `.env.local` とコード内デフォルトの 2 箇所に持つと不整合の温床になるため、デフォルト値はコードから排除する
+- **アプリは `.env` を読まない**（godotenv 等を使わない）。環境変数の注入は外側（`Makefile` / コンテナ / CI）の責務とし、12-factor app の方針に従う
+- **`Makefile` が `.env.local` をロードする**。`include .env.local` + `export` により、`make run`・`make test`・`make up` の子プロセス（`go` / `docker compose`）へ環境変数を渡す。開発者は `make` 経由で一貫して実行する
+
+#### 主要ターゲット
+
+| ターゲット  | 用途                               |
+| ----------- | ---------------------------------- |
+| `make help` | ターゲット一覧を表示（デフォルト） |
+| `make up`   | ローカル開発用 PostgreSQL を起動   |
+| `make down` | ローカル開発用 PostgreSQL を停止   |
+| `make run`  | API サーバーを起動                 |
+| `make test` | すべてのテストを実行               |
+
+#### テスト時の環境変数
+
+integration テストは `make test` 経由で `.env.local` の環境変数を受け取り、`config.Load()` で組み立てた DSN（`DBConfig.DSN()`）に接続する。`config.Load()` は全変数の存在を要求するため、テストも `make test` 経由での実行を前提とする（割り切り）。別の DB を対象にしたい場合のみ `TEST_DATABASE_URL` で DSN を直接上書きでき、この場合は `config.Load()` を呼ばない。
+
 ### 学習優先の設計判断
 
 | 判断             | 内容                                         |

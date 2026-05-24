@@ -5,3 +5,5 @@ validation.email.already_registered: "validation error: email is already registe
 validation.user_status.invalid: "validation error: status must be ACTIVE or INACTIVE"
 validation.display_name.length: "validation error: displayName must be {{.Min}}-{{.Max}} characters"
 validation.user.already_inactive: "validation error: user is already inactive"
+common.invalid_request_body: "invalid request body"
+common.internal_error: "internal server error"

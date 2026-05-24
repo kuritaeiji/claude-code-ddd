@@ -4,6 +4,7 @@
       "Read(//home/kuritaeiji/claude-code/**)",
       "Write(//home/kuritaeiji/claude-code/**)",
       "Edit(//home/kuritaeiji/claude-code/**)",
+      "Bash(make *)",
       "Bash(date *)",
       "Bash(mkdir *)",
       "Bash(find *)",
@@ -45,12 +46,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); active=$(echo \"$input\" | jq -r '.stop_hook_active // false'); if [ \"$active\" = \"true\" ]; then exit 0; fi; proj=$(echo \"$input\" | jq -r '.cwd // \"\"'); [ -z \"$proj\" ] && proj=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; if ! cd \"$proj/backend\" 2>/dev/null; then jq -cn --arg p \"$proj/backend\" '{\"decision\":\"block\",\"reason\":(\"golangci-lint hook misconfigured: cannot cd into \"+$p)}'; exit 0; fi; result=$($HOME/.goenv/shims/golangci-lint run ./... 2>&1); rc=$?; if [ $rc -ne 0 ] && [ $rc -ne 5 ]; then jq -cn --arg m \"$result\" '{\"decision\":\"block\",\"reason\":(\"golangci-lint failed:\\n\"+$m+\"\\n\\nFix the lint issues before stopping.\")}'; else exit 0; fi",
-            "timeout": 120,
-            "statusMessage": "golangci-lint 実行中..."
+            "command": "cd /home/kuritaeiji/claude-code/backend && make vet",
+            "timeout": 60,
+            "statusMessage": "go vet 実行中..."
           }
         ]
       }
     ]
   }
 }
+

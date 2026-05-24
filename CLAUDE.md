@@ -21,11 +21,14 @@ DDD・オニオンアーキテクチャ・CQRS を Go で実践するための�
 - **CQRS**: クエリ（Read）はドメインモデルを経由せず、専用 DTO で DB から直接読み取る
 - **ドメインイベント**: インメモリ EventBus。EventHandler は Usecase 層に実装し、main.go で DI する
 - **バリデーション**: すべてドメイン層で実施する
+- **環境変数**: 値は `.env.local` / `.env.example` を唯一の source of truth とし、Go コードにデフォルト値を持たせない（未設定なら fail-fast）。`Makefile` が `.env.local` をロードして `go` / `docker compose` をラップする
 
 ### 開発ワークフロー
 
 機能を実装するときは `/implement <機能名>` スキルを使う。
 スキルが以下を自動実行する：ドキュメント理解 → パターン調査 → 計画作成（`.steering/`）→ 実装ループ → レビュー → テスト
+
+ローカル実行は `backend/` で `make` を使う：`make up`（DB 起動）→ `make run`（API 起動）/ `make test`（テスト）。`make help` でターゲット一覧。
 
 ---
 
@@ -53,7 +56,8 @@ DDD・オニオンアーキテクチャ・CQRS を Go で実践するための�
 │   │   ├── controller/             # net/http ハンドラー（xxxRequest → xxxParams → xxxDTO → xxxResponse）
 │   │   └── infrastructure/
 │   │       ├── repository/         # gorm リポジトリ実装
-│   │       └── event/              # インメモリ EventBus 実装
+│   │       ├── event/              # インメモリ EventBus 実装
+│   │       └── config/             # 環境変数の読み込み集約（Config 構造体・DSN 組み立て）
 │   └── pkg/errors/                 # ドメインエラー種別定義
 ├── .steering/                   # 実装計画（/implement スキルが自動生成）
 │   └── YYYYMMDD-<機能名>/
