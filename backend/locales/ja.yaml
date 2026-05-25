@@ -5,5 +5,6 @@ validation.email.already_registered: "バリデーションエラー: メール�
 validation.user_status.invalid: "バリデーションエラー: ステータスはACTIVEまたはINACTIVEである必要があります"
 validation.display_name.length: "バリデーションエラー: 表示名は{{.Min}}〜{{.Max}}文字である必要があります"
 validation.user.already_inactive: "バリデーションエラー: ユーザーは既に非活性化されています"
+not_found.user: "ユーザーが見つかりません"
 common.invalid_request_body: "リクエストボディの形式が正しくありません"
 common.internal_error: "サーバー内部エラーが発生しました"

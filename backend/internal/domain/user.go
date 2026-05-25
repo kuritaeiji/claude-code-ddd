@@ -15,6 +15,11 @@ import (
 // 業務ルール（BR-U-01）への解釈はドメインサービス UserRegistrar 側で行う。
 var ErrEmailDuplicate = errors.New("email already exists")
 
+// ErrUserNotFound は UserRepository.FindByID が対象ユーザーを見つけられなかった際に返す sentinel error。
+// インフラ層は DB 固有の「未存在」（gorm.ErrRecordNotFound 等）をこの sentinel に翻訳して返し、
+// HTTP 404 への解釈（NotFoundError 化）はユースケース層が行う。
+var ErrUserNotFound = errors.New("user not found")
+
 const (
 	displayNameMinLen = 1
 	displayNameMaxLen = 50
@@ -168,4 +173,6 @@ type UserRepository interface {
 	Insert(user *User) error
 	Update(user *User) error
 	ExistsByEmail(email Email) (bool, error)
+	// FindByID は対象ユーザーを復元して返す。未存在時は ErrUserNotFound を返す。
+	FindByID(id UserID) (*User, error)
 }

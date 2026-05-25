@@ -14,6 +14,7 @@ import (
 	"github.com/kuritaeiji/claude-code-ddd/internal/controller"
 	"github.com/kuritaeiji/claude-code-ddd/internal/domain"
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/config"
+	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/event"
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/i18n"
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/repository"
 	"github.com/kuritaeiji/claude-code-ddd/internal/usecase/command"
@@ -48,13 +49,19 @@ func run() error {
 	apperrors.SetDefaultTranslator(englishTranslator)
 	i18n.SetFallbackTranslator(englishTranslator)
 
+	eventBus := event.NewInMemoryBus()
+	// UserDeactivated の購読者（担当者除外ハンドラ）は Task 集約実装フェーズで eventBus.Subscribe する。
+	// 現時点では未登録のため publish は no-op。
+
 	userRepo := repository.NewUserRepository(db)
 	registrar := domain.NewUserRegistrar(userRepo)
 	registerUser := command.NewRegisterUserCommand(registrar)
-	userCtrl := controller.NewUserController(registerUser)
+	deactivateUser := command.NewDeactivateUserCommand(userRepo, eventBus)
+	userCtrl := controller.NewUserController(registerUser, deactivateUser)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", userCtrl.HandleRegister)
+	mux.HandleFunc("PATCH /users/{id}/deactivate", userCtrl.HandleDeactivate)
 	handler := controller.NewI18nMiddleware(bundle)(mux)
 
 	addr := ":" + cfg.Port

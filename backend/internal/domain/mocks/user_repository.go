@@ -33,3 +33,9 @@ func (m *UserRepository) ExistsByEmail(email domain.Email) (bool, error) {
 	args := m.Called(email)
 	return args.Bool(0), args.Error(1)
 }
+
+func (m *UserRepository) FindByID(id domain.UserID) (*domain.User, error) {
+	args := m.Called(id)
+	user, _ := args.Get(0).(*domain.User)
+	return user, args.Error(1)
+}

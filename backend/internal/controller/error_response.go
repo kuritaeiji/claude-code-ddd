@@ -26,6 +26,12 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 
+	var nfe *apperrors.NotFoundError
+	if errors.As(err, &nfe) {
+		writeJSON(w, http.StatusNotFound, errorResponse{Message: translator.Translate(nfe.MessageID, nfe.TemplateData)})
+		return
+	}
+
 	writeJSON(w, http.StatusInternalServerError, errorResponse{Message: translator.Translate("common.internal_error", nil)})
 }
 

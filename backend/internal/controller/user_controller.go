@@ -9,11 +9,12 @@ import (
 )
 
 type UserController struct {
-	register *command.RegisterUserCommand
+	register   *command.RegisterUserCommand
+	deactivate *command.DeactivateUserCommand
 }
 
-func NewUserController(register *command.RegisterUserCommand) *UserController {
-	return &UserController{register: register}
+func NewUserController(register *command.RegisterUserCommand, deactivate *command.DeactivateUserCommand) *UserController {
+	return &UserController{register: register, deactivate: deactivate}
 }
 
 type RegisterUserRequest struct {
@@ -48,6 +49,33 @@ func (c *UserController) HandleRegister(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusCreated, RegisterUserResponse{
+		ID:          dto.ID,
+		Email:       dto.Email,
+		DisplayName: dto.DisplayName,
+		Status:      dto.Status,
+	})
+}
+
+type DeactivateUserResponse struct {
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	Status      string `json:"status"`
+}
+
+// HandleDeactivate は PATCH /users/{id}/deactivate を処理する。
+// パスパラメータ id をそのまま Usecase に渡し、UUID 検証・未存在・既に非活性の判定は
+// ドメイン／ユースケース層に委ねる。エラーは writeError がステータスを決定する。
+func (c *UserController) HandleDeactivate(w http.ResponseWriter, r *http.Request) {
+	dto, err := c.deactivate.Execute(command.DeactivateUserParams{
+		ID: r.PathValue("id"),
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, DeactivateUserResponse{
 		ID:          dto.ID,
 		Email:       dto.Email,
 		DisplayName: dto.DisplayName,

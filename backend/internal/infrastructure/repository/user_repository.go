@@ -75,12 +75,25 @@ func (r *userRepository) Insert(user *domain.User) error {
 	return nil
 }
 
-// Update は既存ユーザーを UPDATE する。
-// PrimaryKey ベースの全カラム更新（gorm Save）。Save は対象行がなくても INSERT してしまうため、
-// 明示的に主キー指定の Updates で行数を見て NotFound 相当を判定する余地があるが、
-// 本実装スコープでは U-01 のみ動かすため最小実装（Save）にとどめる。
+// Update は既存ユーザーを UPDATE する（U-02 非活性化の status 書き換え等）。
+// PrimaryKey ベースの全カラム更新（gorm Save）。Save は対象行がなくても INSERT してしまうが、
+// 呼び出し元のユースケースが事前に FindByID で存在を確認している前提のため、最小実装（Save）にとどめる。
 func (r *userRepository) Update(user *domain.User) error {
 	return r.db.Save(toModel(user)).Error
+}
+
+// FindByID は主キーでユーザーを 1 件取得して復元する。
+// gorm の未存在エラー（gorm.ErrRecordNotFound）はドメイン語彙の sentinel
+// domain.ErrUserNotFound に翻訳して返す。HTTP 404 への解釈はユースケース層の責務。
+func (r *userRepository) FindByID(id domain.UserID) (*domain.User, error) {
+	var m userModel
+	if err := r.db.First(&m, "id = ?", id.String()).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return toDomain(&m), nil
 }
 
 func (r *userRepository) ExistsByEmail(email domain.Email) (bool, error) {

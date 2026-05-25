@@ -3,3 +3,4 @@
 *.local*
 .vscode
 .steering
+backend/bin

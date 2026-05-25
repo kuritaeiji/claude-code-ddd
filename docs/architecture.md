@@ -136,11 +136,71 @@ flowchart LR
 
 ### テスト方針
 
-- ユニットテストは `testify`（`assert` / `require` / `mock`）を採用する
+- テストフレームワークは `testify`（`assert` / `require` / `mock`）を採用する
 - Domain 層で定義したインターフェース（`UserRepository`・`TaskRepository`・`EventBus` 等）のモックは、テスト用パッケージ `backend/internal/domain/mocks/` に testify/mock ベースで実装する
   - テスト関数内に手書きの fake / stub を都度書かない（再利用性と一貫性のため）
   - モックは Domain インターフェースを満たす必要があり、`mocks` パッケージは Domain にのみ依存する
   - プロダクションコードから `mocks` パッケージを参照することは禁止（テストファイルからのみ import）
+
+#### 層別テスト戦略
+
+| 層               | テスト種別         | インフラ依存      | 並列実行       |
+| ---------------- | ------------------ | ----------------- | -------------- |
+| Domain層         | ユニットテスト     | なし              | `t.Parallel()` |
+| Usecase層        | ユニットテスト     | モック            | `t.Parallel()` |
+| Controller層     | 結合テスト         | モック（DB のみ） | `t.Parallel()` |
+| Infrastructure層 | インテグレーション | 実 DB             | 並列化しない   |
+
+##### Domain 層
+
+純粋なユニットテスト。外部依存はなく、エンティティ・値オブジェクト・ドメインサービスのビジネスルールを直接検証する。`t.Parallel()` を使い全テストを並列実行する。
+
+```go
+// 例: エンティティのメソッドをそのまま呼んで状態と返り値を検証
+u := domain.ReconstructUser(id, email, "Alice", domain.UserStatusActive)
+require.NoError(t, u.Deactivate())
+assert.Equal(t, domain.UserStatusInactive, u.Status())
+```
+
+##### Usecase 層
+
+`domain/mocks/` のモックで Repository・EventBus を差し替え、ユースケースのオーケストレーション（正常系・異常系・エラー伝搬）を検証する。`t.Parallel()` で並列実行する。DB は不要。
+
+```go
+// 例: モックの期待値を設定し Execute を呼ぶ
+repo.On("FindByID", id).Return(user, nil).Once()
+repo.On("Update", mock.AnythingOfType("*domain.User")).Return(nil).Once()
+bus.On("Publish", mock.AnythingOfType("domain.UserDeactivated")).Return(nil).Once()
+dto, err := cmd.Execute(params)
+repo.AssertExpectations(t)
+```
+
+##### Controller 層
+
+`net/http/httptest` を使い、実ユースケース＋実 EventBus を組み立て、Repository だけをモックに差し替えた HTTP ハンドラーに対してリクエストを送信する。i18n ミドルウェアも含めた全スタックを通した HTTP ステータスコード・レスポンスボディ・多言語メッセージを検証する。DB は不要。`t.Parallel()` で並列実行する。
+
+```go
+// 例: モック repo でハンドラーを構築し HTTP リクエストを送信
+repo := mocks.NewUserRepository()
+repo.On("ExistsByEmail", email).Return(false, nil).Once()
+repo.On("Insert", mock.AnythingOfType("*domain.User")).Return(nil).Once()
+rec := doPost(t, repoBackedHandler(t, repo), body, "ja")
+assert.Equal(t, http.StatusCreated, rec.Code)
+```
+
+##### Infrastructure 層
+
+実 PostgreSQL に接続するインテグレーションテスト。`make up` で起動したローカル DB を対象とし、各テストの先頭で `TRUNCATE` してデータを初期化する。テスト間の干渉を避けるため `t.Parallel()` は使わない。
+
+```go
+// 例: 実 DB で Insert → FindByID のラウンドトリップを検証
+db := newTestDB(t)          // TRUNCATE を含む初期化
+repo := NewUserRepository(db)
+require.NoError(t, repo.Insert(user))
+got, err := repo.FindByID(user.ID())
+require.NoError(t, err)
+assert.Equal(t, user.ID().String(), got.ID().String())
+```
 
 ### ローカル開発・環境変数管理
 

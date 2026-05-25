@@ -17,6 +17,7 @@ import (
 	"github.com/kuritaeiji/claude-code-ddd/internal/controller"
 	"github.com/kuritaeiji/claude-code-ddd/internal/domain"
 	"github.com/kuritaeiji/claude-code-ddd/internal/domain/mocks"
+	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/event"
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/i18n"
 	"github.com/kuritaeiji/claude-code-ddd/internal/usecase/command"
 )
@@ -34,11 +35,14 @@ func repoBackedHandler(t *testing.T, repo *mocks.UserRepository) http.Handler {
 	require.NoError(t, err)
 
 	registrar := domain.NewUserRegistrar(repo)
-	cmd := command.NewRegisterUserCommand(registrar)
-	ctrl := controller.NewUserController(cmd)
+	registerCmd := command.NewRegisterUserCommand(registrar)
+	// ハンドラ未登録の実 EventBus を使う。UserDeactivated は publish されるが購読者がいないため no-op。
+	deactivateCmd := command.NewDeactivateUserCommand(repo, event.NewInMemoryBus())
+	ctrl := controller.NewUserController(registerCmd, deactivateCmd)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", ctrl.HandleRegister)
+	mux.HandleFunc("PATCH /users/{id}/deactivate", ctrl.HandleDeactivate)
 	return controller.NewI18nMiddleware(bundle)(mux)
 }
 
@@ -46,6 +50,17 @@ func doPost(t *testing.T, h http.Handler, body string, acceptLanguage string) *h
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	if acceptLanguage != "" {
+		req.Header.Set("Accept-Language", acceptLanguage)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func doPatch(t *testing.T, h http.Handler, path string, acceptLanguage string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPatch, path, nil)
 	if acceptLanguage != "" {
 		req.Header.Set("Accept-Language", acceptLanguage)
 	}
@@ -154,4 +169,69 @@ func TestUserController_Register_JapaneseAcceptLanguage(t *testing.T) {
 	var body map[string]string
 	decodeBody(t, rec, &body)
 	assert.Contains(t, body["message"], "メールアドレス")
+}
+
+func TestUserController_Deactivate_Success(t *testing.T) {
+	t.Parallel()
+
+	id := domain.GenerateUserID()
+	email, err := domain.NewEmail("user@example.com")
+	require.NoError(t, err)
+	user := domain.ReconstructUser(id, email, "Alice", domain.UserStatusActive)
+
+	repo := mocks.NewUserRepository()
+	repo.On("FindByID", id).Return(user, nil).Once()
+	repo.On("Update", mock.AnythingOfType("*domain.User")).Return(nil).Once()
+
+	rec := doPatch(t, repoBackedHandler(t, repo), "/users/"+id.String()+"/deactivate", "")
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp controller.DeactivateUserResponse
+	decodeBody(t, rec, &resp)
+	assert.Equal(t, id.String(), resp.ID)
+	assert.Equal(t, string(domain.UserStatusInactive), resp.Status)
+	repo.AssertExpectations(t)
+}
+
+func TestUserController_Deactivate_InvalidID(t *testing.T) {
+	t.Parallel()
+
+	repo := mocks.NewUserRepository()
+	rec := doPatch(t, repoBackedHandler(t, repo), "/users/not-a-uuid/deactivate", "")
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	repo.AssertNotCalled(t, "FindByID")
+}
+
+func TestUserController_Deactivate_NotFound(t *testing.T) {
+	t.Parallel()
+
+	id := domain.GenerateUserID()
+	repo := mocks.NewUserRepository()
+	repo.On("FindByID", id).Return(nil, domain.ErrUserNotFound).Once()
+
+	rec := doPatch(t, repoBackedHandler(t, repo), "/users/"+id.String()+"/deactivate", "")
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	repo.AssertNotCalled(t, "Update")
+}
+
+func TestUserController_Deactivate_AlreadyInactive(t *testing.T) {
+	t.Parallel()
+
+	id := domain.GenerateUserID()
+	email, err := domain.NewEmail("user@example.com")
+	require.NoError(t, err)
+	inactive := domain.ReconstructUser(id, email, "Alice", domain.UserStatusInactive)
+
+	repo := mocks.NewUserRepository()
+	repo.On("FindByID", id).Return(inactive, nil).Once()
+
+	rec := doPatch(t, repoBackedHandler(t, repo), "/users/"+id.String()+"/deactivate", "ja")
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	var body map[string]string
+	decodeBody(t, rec, &body)
+	assert.Contains(t, body["message"], "非活性")
+	repo.AssertNotCalled(t, "Update")
 }

@@ -79,3 +79,43 @@ func TestIntegration_UserRepository_Insert_DuplicateEmail(t *testing.T) {
 	err := repo.Insert(newActiveUser(t, "dup@example.com", "Bob"))
 	require.ErrorIs(t, err, domain.ErrEmailDuplicate)
 }
+
+func TestIntegration_UserRepository_FindByID(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+
+	user := newActiveUser(t, "find@example.com", "Alice")
+	require.NoError(t, repo.Insert(user))
+
+	got, err := repo.FindByID(user.ID())
+	require.NoError(t, err)
+	assert.True(t, user.ID().Equals(got.ID()))
+	assert.Equal(t, "find@example.com", got.Email().String())
+	assert.Equal(t, "Alice", got.DisplayName())
+	assert.Equal(t, domain.UserStatusActive, got.Status())
+}
+
+func TestIntegration_UserRepository_FindByID_NotFound(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+
+	_, err := repo.FindByID(domain.GenerateUserID())
+	require.ErrorIs(t, err, domain.ErrUserNotFound)
+}
+
+// Update による非活性化（status 列の書き換え）が永続化されることを検証する。
+// U-02 のユースケースが FindByID → Deactivate → Update で状態遷移を保存する経路の最終防衛線。
+func TestIntegration_UserRepository_Update_Deactivate(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+
+	user := newActiveUser(t, "deact@example.com", "Alice")
+	require.NoError(t, repo.Insert(user))
+
+	require.NoError(t, user.Deactivate())
+	require.NoError(t, repo.Update(user))
+
+	got, err := repo.FindByID(user.ID())
+	require.NoError(t, err)
+	assert.Equal(t, domain.UserStatusInactive, got.Status())
+}
