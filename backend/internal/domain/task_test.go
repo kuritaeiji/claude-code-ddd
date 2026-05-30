@@ -139,9 +139,12 @@ func TestNewDueDate(t *testing.T) {
 
 	t.Run("today is accepted", func(t *testing.T) {
 		t.Parallel()
-		d, err := domain.NewDueDate(time.Now())
+		now := time.Now()
+		d, err := domain.NewDueDate(now)
 		require.NoError(t, err)
-		assert.Equal(t, time.Now().Format("2006-01-02"), d.String())
+		// DueDate は truncateToDate で UTC へ正規化されるため、期待値も UTC 日付で比較する
+		// （ローカル日付と UTC 日付がずれる時間帯での flake を防ぐ）。
+		assert.Equal(t, now.UTC().Format("2006-01-02"), d.String())
 	})
 
 	t.Run("future date is accepted", func(t *testing.T) {
@@ -149,7 +152,7 @@ func TestNewDueDate(t *testing.T) {
 		future := time.Now().AddDate(0, 0, 1)
 		d, err := domain.NewDueDate(future)
 		require.NoError(t, err)
-		assert.Equal(t, future.Format("2006-01-02"), d.String())
+		assert.Equal(t, future.UTC().Format("2006-01-02"), d.String())
 	})
 
 	t.Run("past date is rejected (BR-T-03)", func(t *testing.T) {
@@ -303,7 +306,7 @@ func TestReconstructTask(t *testing.T) {
 	assert.Equal(t, "old title", task.Title())
 	assert.Equal(t, domain.PriorityLow, task.Priority())
 	require.NotNil(t, task.DueDate())
-	assert.Equal(t, past.Format("2006-01-02"), task.DueDate().String())
+	assert.Equal(t, past.UTC().Format("2006-01-02"), task.DueDate().String())
 }
 
 // 復元はリポジトリの DB 値を信頼するため、BR-T-05 違反のタイトルでも検証せず復元可能。
