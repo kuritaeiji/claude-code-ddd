@@ -50,8 +50,6 @@ func run() error {
 	i18n.SetFallbackTranslator(englishTranslator)
 
 	eventBus := event.NewInMemoryBus()
-	// UserDeactivated の購読者（担当者除外ハンドラ）は Task 集約実装フェーズで eventBus.Subscribe する。
-	// 現時点では未登録のため publish は no-op。
 
 	userRepo := repository.NewUserRepository(db)
 	registrar := domain.NewUserRegistrar(userRepo)
@@ -60,6 +58,8 @@ func run() error {
 	userCtrl := controller.NewUserController(registerUser, deactivateUser)
 
 	taskRepo := repository.NewTaskRepository(db)
+	// UserDeactivated を購読し、非活性化ユーザーを全担当タスクから除外する（domain.md の副作用）。
+	eventBus.Subscribe(command.NewRemoveAssigneeOnUserDeactivated(taskRepo))
 	createTask := command.NewCreateTaskCommand(taskRepo, userRepo)
 	updateTask := command.NewUpdateTaskCommand(taskRepo, userRepo)
 	deleteTask := command.NewDeleteTaskCommand(taskRepo)

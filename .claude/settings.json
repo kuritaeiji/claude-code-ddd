@@ -16,11 +16,12 @@
       "Bash(head *)",
       "Bash(cd *)",
       "Bash(sort *)",
-      "Bash(git status*)",
-      "Bash(git diff*)",
-      "Bash(git log*)",
-      "Bash(git show*)",
-      "Bash(git blame*)"
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git blame *)",
+      "Bash(set *)"
     ]
   },
   "enableAllProjectMcpServers": true,
