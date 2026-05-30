@@ -3,6 +3,7 @@ package domain_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -149,7 +150,7 @@ func TestReconstructUser(t *testing.T) {
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
 
-	u := domain.ReconstructUser(id, email, "Bob", domain.UserStatusInactive)
+	u := domain.ReconstructUser(id.String(), email.String(), "Bob", domain.UserStatusInactive)
 	assert.True(t, id.Equals(u.ID()))
 	assert.Equal(t, domain.UserStatusInactive, u.Status())
 	assert.Empty(t, u.PullEvents(), "reconstruction must not enqueue events")
@@ -165,57 +166,15 @@ func TestReconstructUser_SkipsDisplayNameValidation(t *testing.T) {
 	t.Run("display name longer than 50 chars is accepted on reconstruction", func(t *testing.T) {
 		t.Parallel()
 		over := strings.Repeat("a", 60)
-		u := domain.ReconstructUser(domain.GenerateUserID(), email, over, domain.UserStatusActive)
+		u := domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), over, domain.UserStatusActive)
 		assert.Equal(t, over, u.DisplayName())
 	})
 
 	t.Run("empty display name is accepted on reconstruction", func(t *testing.T) {
 		t.Parallel()
-		u := domain.ReconstructUser(domain.GenerateUserID(), email, "", domain.UserStatusActive)
+		u := domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), "", domain.UserStatusActive)
 		assert.Equal(t, "", u.DisplayName())
 	})
-}
-
-func TestRestoreUserID(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		value string
-	}{
-		{"valid uuid", uuid.NewString()},
-		{"not a uuid (still accepted)", "not-a-uuid"},
-		{"empty (still accepted)", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			id := domain.RestoreUserID(tt.value)
-			assert.Equal(t, tt.value, id.String())
-		})
-	}
-}
-
-func TestRestoreEmail(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		value string
-	}{
-		{"valid", "user@example.com"},
-		{"missing at-sign (still accepted)", "userexample.com"},
-		{"empty (still accepted)", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			email := domain.RestoreEmail(tt.value)
-			assert.Equal(t, tt.value, email.String())
-		})
-	}
 }
 
 func TestUser_Deactivate(t *testing.T) {
@@ -226,7 +185,7 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("active to inactive enqueues event", func(t *testing.T) {
 		t.Parallel()
-		u := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
+		u := domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), "Alice", domain.UserStatusActive)
 
 		require.NoError(t, u.Deactivate())
 
@@ -241,7 +200,7 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("already-inactive user returns validation error (BR-U-03)", func(t *testing.T) {
 		t.Parallel()
-		u := domain.ReconstructUser(domain.GenerateUserID(), email, "Bob", domain.UserStatusInactive)
+		u := domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), "Bob", domain.UserStatusInactive)
 
 		err := u.Deactivate()
 
@@ -254,7 +213,7 @@ func TestUser_Deactivate(t *testing.T) {
 
 	t.Run("double deactivate rejects the second call", func(t *testing.T) {
 		t.Parallel()
-		u := domain.ReconstructUser(domain.GenerateUserID(), email, "Carol", domain.UserStatusActive)
+		u := domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), "Carol", domain.UserStatusActive)
 
 		require.NoError(t, u.Deactivate())
 		err := u.Deactivate()
@@ -269,7 +228,7 @@ func TestUser_PullEvents(t *testing.T) {
 
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
-	u := domain.ReconstructUser(domain.GenerateUserID(), email, "Alice", domain.UserStatusActive)
+	u := domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), "Alice", domain.UserStatusActive)
 	require.NoError(t, u.Deactivate())
 
 	events := u.PullEvents()
@@ -277,4 +236,24 @@ func TestUser_PullEvents(t *testing.T) {
 
 	again := u.PullEvents()
 	assert.Empty(t, again, "PullEvents must clear the queue")
+}
+
+func TestUserDeactivated(t *testing.T) {
+	t.Parallel()
+
+	id := domain.GenerateUserID()
+	before := time.Now()
+	evt := domain.NewUserDeactivated(id)
+	after := time.Now()
+
+	assert.True(t, id.Equals(evt.UserID()))
+	assert.Equal(t, "user.deactivated", evt.EventName())
+	assert.False(t, evt.OccurredAt().Before(before))
+	assert.False(t, evt.OccurredAt().After(after))
+}
+
+func TestUserDeactivated_ImplementsDomainEvent(t *testing.T) {
+	t.Parallel()
+
+	var _ domain.DomainEvent = domain.NewUserDeactivated(domain.GenerateUserID())
 }

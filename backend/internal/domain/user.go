@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"net/mail"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -36,13 +37,6 @@ func NewUserID(value string) (UserID, error) {
 	return UserID{value: value}, nil
 }
 
-// RestoreUserID はリポジトリからの復元専用ファクトリ。
-// 検証を行わないため、業務ロジックから呼び出してはならない（BR-U-* の入力検証経路を迂回する）。
-// 呼び出し側はインフラ層のリポジトリ実装に限定すること。
-func RestoreUserID(value string) UserID {
-	return UserID{value: value}
-}
-
 func GenerateUserID() UserID {
 	return UserID{value: uuid.NewString()}
 }
@@ -64,13 +58,6 @@ func NewEmail(value string) (Email, error) {
 		return Email{}, apperrors.NewValidationError("validation.email.invalid", nil)
 	}
 	return Email{value: value}, nil
-}
-
-// RestoreEmail はリポジトリからの復元専用ファクトリ。
-// 検証を行わないため、業務ロジックから呼び出してはならない（BR-U-* の入力検証経路を迂回する）。
-// 呼び出し側はインフラ層のリポジトリ実装に限定すること。
-func RestoreEmail(value string) Email {
-	return Email{value: value}
 }
 
 func (e Email) String() string { return e.value }
@@ -119,14 +106,15 @@ func newUser(email Email, displayName string) (*User, error) {
 }
 
 // ReconstructUser はリポジトリからの復元専用ファクトリ。
+// DB のプリミティブ値を直接受け取り、値オブジェクトを無検査で組み立てる（検証専用の公開ファクトリを増やさないため）。
 // 復元は「過去に妥当だった状態の再構築」であり、業務ルール（BR-U-02 等）の再検査は行わない。
 // 業務ルール変更時に過去レコードが取得不能になることを避けるため、
 // および DB 不整合は ValidationError ではなく内部エラーとして扱うべきであるため。
 // 呼び出し側はインフラ層のリポジトリ実装に限定すること。
-func ReconstructUser(id UserID, email Email, displayName string, status UserStatus) *User {
+func ReconstructUser(id, email, displayName string, status UserStatus) *User {
 	return &User{
-		id:          id,
-		email:       email,
+		id:          UserID{value: id},
+		email:       Email{value: email},
 		displayName: displayName,
 		status:      status,
 	}
@@ -165,6 +153,24 @@ func (u *User) PullEvents() []DomainEvent {
 	return events
 }
 
+// UserDeactivated は User 集約が非活性化されたときに発行するドメインイベント。
+// 発行元の集約（User）と同じファイルに置き、event.go はイベント基盤の IF のみに保つ。
+type UserDeactivated struct {
+	userID     UserID
+	occurredAt time.Time
+}
+
+func NewUserDeactivated(userID UserID) UserDeactivated {
+	return UserDeactivated{
+		userID:     userID,
+		occurredAt: time.Now(),
+	}
+}
+
+func (e UserDeactivated) UserID() UserID        { return e.userID }
+func (e UserDeactivated) EventName() string     { return "user.deactivated" }
+func (e UserDeactivated) OccurredAt() time.Time { return e.occurredAt }
+
 // UserRepository は新規作成と更新を別メソッドに分ける。
 // gorm の `Save` が「ID 有無で INSERT/UPDATE を切り替える」挙動はインフラの都合であり、
 // ユースケースは登録（U-01）と非活性化（U-02）の文脈で意図を既に持っているため、
@@ -175,4 +181,6 @@ type UserRepository interface {
 	ExistsByEmail(email Email) (bool, error)
 	// FindByID は対象ユーザーを復元して返す。未存在時は ErrUserNotFound を返す。
 	FindByID(id UserID) (*User, error)
+	// FindByIDs は複数ユーザーを一括で復元して返す。存在しない ID は結果に含まれない。
+	FindByIDs(ids []UserID) ([]*User, error)
 }

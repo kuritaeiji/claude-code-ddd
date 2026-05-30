@@ -28,7 +28,29 @@ DDD・オニオンアーキテクチャ・CQRS を Go で実践するための�
 機能を実装するときは `/implement <機能名>` スキルを使う。
 スキルが以下を自動実行する：ドキュメント理解 → パターン調査 → 計画作成（`.steering/`）→ 実装ループ → レビュー → テスト
 
-ローカル実行は `backend/` で `make` を使う：`make up`（DB 起動）→ `make run`（API 起動）/ `make test`（テスト）。`make help` でターゲット一覧。
+#### make コマンド一覧（backend/ で実行）
+
+| コマンド     | 用途                                         |
+| ------------ | -------------------------------------------- |
+| `make up`    | ローカル開発用 PostgreSQL を起動             |
+| `make down`  | ローカル開発用 PostgreSQL を停止             |
+| `make run`   | API サーバーを起動                           |
+| `make test`  | すべてのテストを実行                         |
+| `make build` | API バイナリをビルド（`./cmd/api` のみ）     |
+| `make vet`   | 全パッケージの静的解析・コンパイルエラー確認 |
+| `make fmt`   | コードを整形                                 |
+| `make tidy`  | go.mod / go.sum を整理                       |
+
+**`go build`・`go test`・`go vet` などの `go` コマンドを直接実行しない。必ず `make` 経由で実行すること。**
+環境変数の注入は Makefile が `.env.local` をロードして行うため、直接実行すると環境変数が欠けて fail-fast する。
+
+#### テスト実行
+
+`infrastructure/repository` の統合テストは常に実 PostgreSQL に接続する。**`make test` の前には必ず `make up` を実行すること。**
+
+```
+make up && make test
+```
 
 ---
 
@@ -49,7 +71,7 @@ DDD・オニオンアーキテクチャ・CQRS を Go で実践するための�
 │   │   ├── domain/                 # Domain層: エンティティ・値オブジェクト・リポジトリIF・ドメインイベント
 │   │   │   ├── task.go
 │   │   │   ├── user.go
-│   │   │   └── event.go            # EventBus IF・EventHandler IF・イベント型定義
+│   │   │   └── event.go            # EventBus IF・EventHandler IF・DomainEvent IF（個別イベント型は各集約に定義）
 │   │   ├── usecase/
 │   │   │   ├── command/            # CQRSコマンド（書き込み）・EventHandler実装
 │   │   │   └── query/              # CQRSクエリ（読み込み）・DB直接読み取り

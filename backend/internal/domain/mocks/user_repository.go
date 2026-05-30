@@ -39,3 +39,9 @@ func (m *UserRepository) FindByID(id domain.UserID) (*domain.User, error) {
 	user, _ := args.Get(0).(*domain.User)
 	return user, args.Error(1)
 }
+
+func (m *UserRepository) FindByIDs(ids []domain.UserID) ([]*domain.User, error) {
+	args := m.Called(ids)
+	users, _ := args.Get(0).([]*domain.User)
+	return users, args.Error(1)
+}

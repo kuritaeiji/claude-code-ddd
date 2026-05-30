@@ -14,9 +14,10 @@ import (
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/config"
 )
 
-// newTestDB は PostgreSQL に接続し、users テーブルを作成・クリーンしてから *gorm.DB を返す。
+// newTestDB は PostgreSQL に接続し、全テーブルを作成・クリーンしてから *gorm.DB を返す。
 // 各テストの先頭で必ず TRUNCATE するため、同一プロセス内のテスト実行順序に依存しない。
 // t.Parallel() を使わない前提（同じ DB を共有するため TRUNCATE が並列テストを潰すリスクがある）。
+// task_assignees は tasks・users への FK を持つため、CASCADE 付きで一括 TRUNCATE する。
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	// UNIQUE 違反テストでは gorm のデフォルト Logger が ERROR を吐いてテスト出力を汚すため、
@@ -24,7 +25,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(postgres.Open(testDSN(t)), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err, "PostgreSQL connection failed. Start the DB and run tests via `make up && make test` (which loads .env.local). To target another DB, set TEST_DATABASE_URL.")
 	require.NoError(t, MigrateSchema(db))
-	require.NoError(t, db.Exec("TRUNCATE TABLE users").Error)
+	require.NoError(t, db.Exec("TRUNCATE TABLE task_assignees, tasks, users CASCADE").Error)
 	return db
 }
 
@@ -47,7 +48,7 @@ func newActiveUser(t *testing.T, emailValue, displayName string) *domain.User {
 	t.Helper()
 	email, err := domain.NewEmail(emailValue)
 	require.NoError(t, err)
-	return domain.ReconstructUser(domain.GenerateUserID(), email, displayName, domain.UserStatusActive)
+	return domain.ReconstructUser(domain.GenerateUserID().String(), email.String(), displayName, domain.UserStatusActive)
 }
 
 func TestIntegration_UserRepository_Insert(t *testing.T) {

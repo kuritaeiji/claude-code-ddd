@@ -1,6 +1,8 @@
 ---
 name: review-code
 description: backend/ 配下の Go 実装コードをレビューする。docs/ と照合してビジネスルール・オニオンアーキテクチャの依存方向・DDD設計・CQRS の妥当性を横断チェックし、問題点を報告する。
+model: claude-sonnet-4-6
+effort: xhigh
 ---
 
 # コードレビュー

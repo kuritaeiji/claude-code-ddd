@@ -177,7 +177,7 @@ func TestUserController_Deactivate_Success(t *testing.T) {
 	id := domain.GenerateUserID()
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
-	user := domain.ReconstructUser(id, email, "Alice", domain.UserStatusActive)
+	user := domain.ReconstructUser(id.String(), email.String(), "Alice", domain.UserStatusActive)
 
 	repo := mocks.NewUserRepository()
 	repo.On("FindByID", id).Return(user, nil).Once()
@@ -222,7 +222,7 @@ func TestUserController_Deactivate_AlreadyInactive(t *testing.T) {
 	id := domain.GenerateUserID()
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
-	inactive := domain.ReconstructUser(id, email, "Alice", domain.UserStatusInactive)
+	inactive := domain.ReconstructUser(id.String(), email.String(), "Alice", domain.UserStatusInactive)
 
 	repo := mocks.NewUserRepository()
 	repo.On("FindByID", id).Return(inactive, nil).Once()

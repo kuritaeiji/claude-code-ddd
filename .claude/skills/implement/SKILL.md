@@ -1,7 +1,7 @@
 ---
 name: implement
 description: 機能実装の全ワークフローを自動実行する。ドキュメント理解→パターン調査→計画作成→実装ループ→レビュー→テスト。使用例: /implement ユーザー登録
-model: claude-opus-4-7
+model: claude-opus-4-8
 effort: xhigh
 ---
 

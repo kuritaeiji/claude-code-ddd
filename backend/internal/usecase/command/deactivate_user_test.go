@@ -18,7 +18,7 @@ func newActiveUser(t *testing.T, id domain.UserID, emailValue string) *domain.Us
 	t.Helper()
 	email, err := domain.NewEmail(emailValue)
 	require.NoError(t, err)
-	return domain.ReconstructUser(id, email, "Alice", domain.UserStatusActive)
+	return domain.ReconstructUser(id.String(), email.String(), "Alice", domain.UserStatusActive)
 }
 
 func TestDeactivateUser_Success(t *testing.T) {
@@ -79,7 +79,7 @@ func TestDeactivateUser_AlreadyInactive(t *testing.T) {
 	id := domain.GenerateUserID()
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
-	inactive := domain.ReconstructUser(id, email, "Alice", domain.UserStatusInactive)
+	inactive := domain.ReconstructUser(id.String(), email.String(), "Alice", domain.UserStatusInactive)
 
 	repo := mocks.NewUserRepository()
 	bus := mocks.NewEventBus()

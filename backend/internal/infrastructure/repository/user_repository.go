@@ -34,21 +34,21 @@ func toModel(u *domain.User) *userModel {
 }
 
 // toDomain は users テーブルの 1 行を *domain.User に復元する。
-// 業務ルール（BR-U-*）は登録時に検証済みのため、ReconstructUser / RestoreEmail / RestoreUserID
-// 経由で値オブジェクトを「無検査復元」する。これは domain パッケージで明示された方針。
+// 業務ルール（BR-U-*）は登録時に検証済みのため、ReconstructUser に DB のプリミティブ値を
+// そのまま渡して「無検査復元」する。これは domain パッケージで明示された方針。
 func toDomain(m *userModel) *domain.User {
 	return domain.ReconstructUser(
-		domain.RestoreUserID(m.ID),
-		domain.RestoreEmail(m.Email),
+		m.ID,
+		m.Email,
 		m.DisplayName,
 		domain.UserStatus(m.Status),
 	)
 }
 
-// MigrateSchema は users テーブルのスキーマを最新化する。
+// MigrateSchema は全テーブル（users・tasks・task_assignees）のスキーマを最新化する。
 // 起動時に cmd/api/main.go から 1 回だけ呼ぶ想定（学習目的のため AutoMigrate を採用）。
 func MigrateSchema(db *gorm.DB) error {
-	return db.AutoMigrate(&userModel{})
+	return db.AutoMigrate(&userModel{}, &taskModel{}, &taskAssigneeModel{})
 }
 
 type userRepository struct {
@@ -94,6 +94,26 @@ func (r *userRepository) FindByID(id domain.UserID) (*domain.User, error) {
 		return nil, err
 	}
 	return toDomain(&m), nil
+}
+
+// FindByIDs は複数ユーザーを IN 句で一括取得する。存在しない ID は結果に含まれない。
+func (r *userRepository) FindByIDs(ids []domain.UserID) ([]*domain.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	strs := make([]string, len(ids))
+	for i, id := range ids {
+		strs[i] = id.String()
+	}
+	var models []userModel
+	if err := r.db.Where("id IN ?", strs).Find(&models).Error; err != nil {
+		return nil, err
+	}
+	users := make([]*domain.User, len(models))
+	for i := range models {
+		users[i] = toDomain(&models[i])
+	}
+	return users, nil
 }
 
 func (r *userRepository) ExistsByEmail(email domain.Email) (bool, error) {

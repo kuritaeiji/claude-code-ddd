@@ -16,7 +16,7 @@ func TestToModel(t *testing.T) {
 	email, err := domain.NewEmail("user@example.com")
 	require.NoError(t, err)
 	id := domain.GenerateUserID()
-	u := domain.ReconstructUser(id, email, "Alice", domain.UserStatusActive)
+	u := domain.ReconstructUser(id.String(), email.String(), "Alice", domain.UserStatusActive)
 
 	m := toModel(u)
 

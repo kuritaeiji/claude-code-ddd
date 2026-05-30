@@ -1,6 +1,8 @@
 ---
 name: review-docs
 description: docs/ 配下のドキュメント群をレビューする。整合性・完全性・DDD設計の妥当性を横断チェックし、問題点と改善提案を報告する。
+model: claude-sonnet-4-6
+effort: xhigh
 ---
 
 ## ドキュメント内容
