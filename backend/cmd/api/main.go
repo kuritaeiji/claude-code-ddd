@@ -59,9 +59,18 @@ func run() error {
 	deactivateUser := command.NewDeactivateUserCommand(userRepo, eventBus)
 	userCtrl := controller.NewUserController(registerUser, deactivateUser)
 
+	taskRepo := repository.NewTaskRepository(db)
+	createTask := command.NewCreateTaskCommand(taskRepo, userRepo)
+	updateTask := command.NewUpdateTaskCommand(taskRepo, userRepo)
+	deleteTask := command.NewDeleteTaskCommand(taskRepo)
+	taskCtrl := controller.NewTaskController(createTask, updateTask, deleteTask)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", userCtrl.HandleRegister)
 	mux.HandleFunc("PATCH /users/{id}/deactivate", userCtrl.HandleDeactivate)
+	mux.HandleFunc("POST /tasks", taskCtrl.HandleCreate)
+	mux.HandleFunc("PATCH /tasks/{id}", taskCtrl.HandleUpdate)
+	mux.HandleFunc("DELETE /tasks/{id}", taskCtrl.HandleDelete)
 	handler := controller.NewI18nMiddleware(bundle)(mux)
 
 	addr := ":" + cfg.Port
