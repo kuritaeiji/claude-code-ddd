@@ -18,6 +18,7 @@ import (
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/i18n"
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/repository"
 	"github.com/kuritaeiji/claude-code-ddd/internal/usecase/command"
+	"github.com/kuritaeiji/claude-code-ddd/internal/usecase/query"
 	apperrors "github.com/kuritaeiji/claude-code-ddd/pkg/errors"
 )
 
@@ -63,7 +64,10 @@ func run() error {
 	createTask := command.NewCreateTaskCommand(taskRepo, userRepo)
 	updateTask := command.NewUpdateTaskCommand(taskRepo, userRepo)
 	deleteTask := command.NewDeleteTaskCommand(taskRepo)
-	taskCtrl := controller.NewTaskController(createTask, updateTask, deleteTask)
+	taskQueryRepo := repository.NewTaskQueryRepository(db)
+	listTasks := query.NewListTasksQuery(taskQueryRepo)
+	getTask := query.NewGetTaskQuery(taskQueryRepo)
+	taskCtrl := controller.NewTaskController(createTask, updateTask, deleteTask, listTasks, getTask)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /users", userCtrl.HandleRegister)
@@ -71,6 +75,8 @@ func run() error {
 	mux.HandleFunc("POST /tasks", taskCtrl.HandleCreate)
 	mux.HandleFunc("PATCH /tasks/{id}", taskCtrl.HandleUpdate)
 	mux.HandleFunc("DELETE /tasks/{id}", taskCtrl.HandleDelete)
+	mux.HandleFunc("GET /tasks", taskCtrl.HandleList)
+	mux.HandleFunc("GET /tasks/{id}", taskCtrl.HandleGet)
 	handler := controller.NewI18nMiddleware(bundle)(mux)
 
 	addr := ":" + cfg.Port

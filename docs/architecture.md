@@ -26,6 +26,7 @@ flowchart TB
     Controller -->|依存| Usecase
     Usecase -->|依存| Domain
     Infrastructure -->|依存| Domain
+    Infrastructure -->|依存（CQRSクエリ実装のみ）| Usecase
 ```
 
 #### イベントバスの依存方向
@@ -39,8 +40,6 @@ flowchart TB
 | `EventBus` 実装                 | Infrastructure層  | `EventHandler` のスライスを保持し、イベントを受け取ったら順に呼び出す                     |
 | `EventHandler` 実装             | Usecase層         | ドメインイベントを受け取り、対応するユースケース処理（例: 担当者除外）を実行する          |
 | ハンドラ登録                    | `cmd/api/main.go` | Usecase の EventHandler を Infrastructure の EventBus に DI する（依存の組み立て場所）    |
-
-これにより Infrastructure は Domain インターフェースのみに依存し、Usecase パッケージを直接参照しない。
 
 #### pkg/errors の位置づけ
 
@@ -141,6 +140,8 @@ flowchart LR
   - テスト関数内に手書きの fake / stub を都度書かない（再利用性と一貫性のため）
   - モックは Domain インターフェースを満たす必要があり、`mocks` パッケージは Domain にのみ依存する
   - プロダクションコードから `mocks` パッケージを参照することは禁止（テストファイルからのみ import）
+- `usecase/query` に定義したインターフェース（`TaskQueryRepository` 等）のモックは、`backend/internal/usecase/query/mocks/` に置く
+  - 同様にテストコードからのみ import し、プロダクションコードからの参照は禁止
 
 #### 層別テスト戦略
 

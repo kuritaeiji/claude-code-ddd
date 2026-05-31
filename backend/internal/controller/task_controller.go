@@ -7,6 +7,7 @@ import (
 
 	"github.com/kuritaeiji/claude-code-ddd/internal/infrastructure/i18n"
 	"github.com/kuritaeiji/claude-code-ddd/internal/usecase/command"
+	"github.com/kuritaeiji/claude-code-ddd/internal/usecase/query"
 	apperrors "github.com/kuritaeiji/claude-code-ddd/pkg/errors"
 )
 
@@ -14,13 +15,21 @@ import (
 const dueDateLayout = "2006-01-02"
 
 type TaskController struct {
-	create *command.CreateTaskCommand
-	update *command.UpdateTaskCommand
-	del    *command.DeleteTaskCommand
+	create    *command.CreateTaskCommand
+	update    *command.UpdateTaskCommand
+	del       *command.DeleteTaskCommand
+	listTasks *query.ListTasksQuery
+	getTask   *query.GetTaskQuery
 }
 
-func NewTaskController(create *command.CreateTaskCommand, update *command.UpdateTaskCommand, del *command.DeleteTaskCommand) *TaskController {
-	return &TaskController{create: create, update: update, del: del}
+func NewTaskController(
+	create *command.CreateTaskCommand,
+	update *command.UpdateTaskCommand,
+	del *command.DeleteTaskCommand,
+	listTasks *query.ListTasksQuery,
+	getTask *query.GetTaskQuery,
+) *TaskController {
+	return &TaskController{create: create, update: update, del: del, listTasks: listTasks, getTask: getTask}
 }
 
 type CreateTaskRequest struct {
@@ -48,6 +57,25 @@ type TaskResponse struct {
 	Priority    string   `json:"priority"`
 	DueDate     *string  `json:"dueDate"`
 	AssigneeIDs []string `json:"assigneeIds"`
+}
+
+type TaskListItemResponse struct {
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Status        string   `json:"status"`
+	Priority      string   `json:"priority"`
+	DueDate       *string  `json:"dueDate"`
+	AssigneeNames []string `json:"assigneeNames"`
+}
+
+type TaskDetailResponse struct {
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
+	Status        string   `json:"status"`
+	Priority      string   `json:"priority"`
+	DueDate       *string  `json:"dueDate"`
+	AssigneeNames []string `json:"assigneeNames"`
 }
 
 // HandleCreate は POST /tasks を処理する。
@@ -121,6 +149,69 @@ func (c *TaskController) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleList は GET /tasks を処理する。
+// 繰り返しクエリパラメータ status・priority で複数値フィルタできる（例: ?status=TODO&status=DONE）。
+// 同一パラメータの複数値は OR、status と priority の間は AND。不正な列挙値は 400、DB エラーは 500 を返す。
+func (c *TaskController) HandleList(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	params := query.ListTasksParams{
+		Statuses:   nonEmpty(q["status"]),
+		Priorities: nonEmpty(q["priority"]),
+	}
+
+	dtos, err := c.listTasks.Execute(params)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	items := make([]TaskListItemResponse, len(dtos))
+	for i, dto := range dtos {
+		items[i] = TaskListItemResponse{
+			ID:            dto.ID,
+			Title:         dto.Title,
+			Status:        dto.Status,
+			Priority:      dto.Priority,
+			DueDate:       formatDueDate(dto.DueDate),
+			AssigneeNames: dto.AssigneeNames,
+		}
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+// HandleGet は GET /tasks/{id} を処理する。
+// 不正 UUID は 400、未存在は 404、DB エラーは 500 を返す。
+func (c *TaskController) HandleGet(w http.ResponseWriter, r *http.Request) {
+	dto, err := c.getTask.Execute(query.GetTaskParams{ID: r.PathValue("id")})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, TaskDetailResponse{
+		ID:            dto.ID,
+		Title:         dto.Title,
+		Description:   dto.Description,
+		Status:        dto.Status,
+		Priority:      dto.Priority,
+		DueDate:       formatDueDate(dto.DueDate),
+		AssigneeNames: dto.AssigneeNames,
+	})
+}
+
+// nonEmpty は繰り返しクエリパラメータから空文字要素を除いたスライスを返す。
+// `?status=` のような空指定をフィルタなし扱いにするため、検証前に除外する。
+// 非空要素が無ければ nil を返し、フィルタ未指定（ListTasksParams のゼロ値）と一致させる。
+func nonEmpty(values []string) []string {
+	var result []string
+	for _, v := range values {
+		if v != "" {
+			result = append(result, v)
+		}
+	}
+	return result
 }
 
 func toTaskResponse(dto command.TaskDTO) TaskResponse {
