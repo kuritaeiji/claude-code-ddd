@@ -62,7 +62,7 @@ make up && make test
 │   ├── production-requirements.md  # プロダクト概要・スコープ・開発フェーズ
 │   ├── domain.md                   # ドメインモデル・ビジネスルール・ドメインイベント
 │   ├── usecase.md                  # ユースケース一覧・APIエンドポイント
-│   ├── architecture.md             # 技術スタック・層構成・データフロー・非機能要件
+│   ├── infrastructure.md           # AWSインフラ構成・ECS/RDS・CI/CD・Terraform
 │   ├── schema.md                   # ER図・テーブル定義・ドメインモデルとのマッピング
 │   └── repository-structure.md     # ディレクトリ構成とその意図
 ├── backend/
